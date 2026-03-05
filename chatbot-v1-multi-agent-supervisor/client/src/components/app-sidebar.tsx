@@ -39,8 +39,8 @@ export function AppSidebar({
               className="flex flex-row items-center gap-3"
             >
               <img
-                src="/logo.png"
-                alt="IUS Logo"
+                src="/logo.svg"
+                alt="Nexus Logo"
                 className="h-8 w-auto cursor-pointer rounded-md px-1 hover:bg-muted"
               />
             </Link>
