@@ -1,0 +1,120 @@
+name: Deploy to Databricks
+
+on:
+  push:
+    branches:
+      - main
+  create:
+    tags:
+      - 'v1.*'
+      - 'v2.*'
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Deploy BOTH apps to dev on every push to main
+  # ─────────────────────────────────────────────
+  deploy-v1-dev:
+    name: Deploy v1 → dev
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chatbot-v1-multi-agent-supervisor
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Deploy bundle
+        run: databricks bundle deploy --target dev
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+      - name: Start app
+        run: databricks bundle run databricks_chatbot --target dev
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+  deploy-v2-dev:
+    name: Deploy v2 → dev
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chatbot-v2-simplified-output
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Deploy bundle
+        run: databricks bundle deploy --target dev
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+      - name: Start app
+        run: databricks bundle run databricks_chatbot --target dev
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+  # ─────────────────────────────────────────────
+  # Deploy v1 to prod on tags like v1.0.0
+  # ─────────────────────────────────────────────
+  deploy-v1-prod:
+    name: Deploy v1 → prod
+    if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/v1.')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chatbot-v1-multi-agent-supervisor
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Deploy bundle
+        run: databricks bundle deploy --target prod
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+      - name: Start app
+        run: databricks bundle run databricks_chatbot --target prod
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+  # ─────────────────────────────────────────────
+  # Deploy v2 to prod on tags like v2.0.0
+  # ─────────────────────────────────────────────
+  deploy-v2-prod:
+    name: Deploy v2 → prod
+    if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/v2.')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chatbot-v2-simplified-output
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Databricks CLI
+        uses: databricks/setup-cli@main
+
+      - name: Deploy bundle
+        run: databricks bundle deploy --target prod
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+      - name: Start app
+        run: databricks bundle run databricks_chatbot --target prod
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
