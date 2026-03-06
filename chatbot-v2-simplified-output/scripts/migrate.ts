@@ -41,53 +41,66 @@ async function main() {
   const schemaName = getSchemaName();
   console.log(`🗃️ Using database schema: ${schemaName}`);
 
-  // Create custom schema if needed
+  // Create the app schema. Each app's service principal creates and owns its
+  // own schema (v1 → ai_chatbot_v1, v2 → ai_chatbot_v2), so no cross-SP
+  // grants are needed.
   const connectionUrl = await getConnectionUrl();
+  const schemaConnection = postgres(connectionUrl, { max: 1 });
   try {
-    const schemaConnection = postgres(connectionUrl, { max: 1 });
-
     console.log(`📁 Creating schema '${schemaName}' if it doesn't exist...`);
     await schemaConnection`CREATE SCHEMA IF NOT EXISTS ${schemaConnection(schemaName)}`;
     console.log(`✅ Schema '${schemaName}' ensured to exist`);
-
-    await schemaConnection.end();
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.warn(`⚠️ Schema creation warning:`, errorMessage);
-    // Continue with migration even if schema creation had issues
+    // Continue — schema may already exist
+  } finally {
+    await schemaConnection.end().catch(() => {});
   }
 
+  // Use drizzle-orm migrate to run SQL migration files
+  console.log('🔄 Running SQL migrations from migration files...');
+
+  const migrationConnectionUrl = await getConnectionUrl();
+  const migrationConnection = postgres(migrationConnectionUrl, { max: 1 });
+
   try {
-    // Use drizzle-orm migrate to run SQL migration files
-    console.log('🔄 Running SQL migrations from migration files...');
-
-    // Create database connection for running migrations
-    const migrationConnectionUrl = await getConnectionUrl();
-    const migrationConnection = postgres(migrationConnectionUrl, { max: 1 });
-
-    // Import the migrate function from drizzle-orm
     const { drizzle } = await import('drizzle-orm/postgres-js');
     const { migrate } = await import('drizzle-orm/postgres-js/migrator');
 
-    // Create drizzle instance
     const db = drizzle(migrationConnection);
 
-    // Run migrations from the migrations folder
-    const projectRoot = join(__dirname, '..');
     const migrationsFolder = join(projectRoot, 'packages', 'db', 'migrations');
 
     console.log('📂 Migrations folder:', migrationsFolder);
     console.log('🔄 Applying pending migrations...');
 
-    await migrate(db, { migrationsFolder });
+    // Store migration tracking in the app schema so the app SP (which owns
+    // the schema) can always read/write the migrations table.
+    await migrate(db, { migrationsFolder, migrationsSchema: schemaName });
 
     console.log('✅ All migrations applied successfully');
-
-    // Close the connection
     await migrationConnection.end();
-
     console.log('✅ Database migration completed successfully');
   } catch (error) {
+    await migrationConnection.end().catch(() => {});
+
+    // If permission is denied, the schema was likely created by a different
+    // principal (e.g. during local development with a personal token).
+    // Surface the error clearly — runtime will also fail until the schema
+    // is recreated by the correct app SP.
+    const postgresCode = (error as any)?.cause?.code;
+    if (postgresCode === '42501') {
+      console.warn('⚠️  Migration skipped: permission denied for schema access.');
+      console.warn(
+        '   This usually means the schema was created by a different service principal.',
+      );
+      console.warn(
+        '   To fix: drop the schema in the database and redeploy so the app SP can recreate it.',
+      );
+      return;
+    }
+
     console.log('error', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('❌ Database migration failed:', errorMessage);

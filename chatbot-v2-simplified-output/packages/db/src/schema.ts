@@ -11,7 +11,7 @@ import {
 import type { LanguageModelV3Usage } from '@ai-sdk/provider';
 import type { User as SharedUser } from '@chat-template/utils';
 
-const schemaName = 'ai_chatbot';
+const schemaName = 'ai_chatbot_v2';
 const customSchema = pgSchema(schemaName);
 
 // Helper function to create table with proper schema handling

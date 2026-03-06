@@ -1,4 +1,4 @@
-CREATE TABLE "ai_chatbot"."Chat" (
+CREATE TABLE "ai_chatbot_v2"."Chat" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"createdAt" timestamp NOT NULL,
 	"title" text NOT NULL,
@@ -7,7 +7,7 @@ CREATE TABLE "ai_chatbot"."Chat" (
 	"lastContext" jsonb
 );
 --> statement-breakpoint
-CREATE TABLE "ai_chatbot"."Message" (
+CREATE TABLE "ai_chatbot_v2"."Message" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"chatId" uuid NOT NULL,
 	"role" varchar NOT NULL,
@@ -16,9 +16,9 @@ CREATE TABLE "ai_chatbot"."Message" (
 	"createdAt" timestamp NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "ai_chatbot"."User" (
+CREATE TABLE "ai_chatbot_v2"."User" (
 	"id" text PRIMARY KEY NOT NULL,
 	"email" varchar(64) NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "ai_chatbot"."Message" ADD CONSTRAINT "Message_chatId_Chat_id_fk" FOREIGN KEY ("chatId") REFERENCES "ai_chatbot"."Chat"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "ai_chatbot_v2"."Message" ADD CONSTRAINT "Message_chatId_Chat_id_fk" FOREIGN KEY ("chatId") REFERENCES "ai_chatbot_v2"."Chat"("id") ON DELETE no action ON UPDATE no action;

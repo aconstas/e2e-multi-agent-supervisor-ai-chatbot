@@ -2,7 +2,7 @@ import { defineConfig } from 'drizzle-kit';
 
 // Use fixed schema name for out-of-the-box functionality
 function getSchemaName() {
-  return 'ai_chatbot';
+  return 'ai_chatbot_v1';
 }
 
 // Environment variables are already loaded by tsx --env-file in migrate.ts

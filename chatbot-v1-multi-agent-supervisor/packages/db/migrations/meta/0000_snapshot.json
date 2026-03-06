@@ -4,9 +4,9 @@
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "ai_chatbot.Chat": {
+    "ai_chatbot_v1.Chat": {
       "name": "Chat",
-      "schema": "ai_chatbot",
+      "schema": "ai_chatbot_v1",
       "columns": {
         "id": {
           "name": "id",
@@ -55,9 +55,9 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "ai_chatbot.Message": {
+    "ai_chatbot_v1.Message": {
       "name": "Message",
-      "schema": "ai_chatbot",
+      "schema": "ai_chatbot_v1",
       "columns": {
         "id": {
           "name": "id",
@@ -103,7 +103,7 @@
           "name": "Message_chatId_Chat_id_fk",
           "tableFrom": "Message",
           "tableTo": "Chat",
-          "schemaTo": "ai_chatbot",
+          "schemaTo": "ai_chatbot_v1",
           "columnsFrom": [
             "chatId"
           ],
@@ -120,9 +120,9 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "ai_chatbot.User": {
+    "ai_chatbot_v1.User": {
       "name": "User",
-      "schema": "ai_chatbot",
+      "schema": "ai_chatbot_v1",
       "columns": {
         "id": {
           "name": "id",

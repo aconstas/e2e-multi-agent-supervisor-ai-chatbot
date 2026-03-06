@@ -41,26 +41,19 @@ async function main() {
   const schemaName = getSchemaName();
   console.log(`🗃️ Using database schema: ${schemaName}`);
 
-  // Create custom schema and apply grants so all app service principals can access it.
-  // CAN_CONNECT_AND_CREATE on the Lakebase already controls who can connect, so
-  // granting to PUBLIC within the database is safe and avoids cross-SP permission issues.
+  // Create the app schema. Each app's service principal creates and owns its
+  // own schema (v1 → ai_chatbot_v1, v2 → ai_chatbot_v2), so no cross-SP
+  // grants are needed.
   const connectionUrl = await getConnectionUrl();
   const schemaConnection = postgres(connectionUrl, { max: 1 });
   try {
     console.log(`📁 Creating schema '${schemaName}' if it doesn't exist...`);
     await schemaConnection`CREATE SCHEMA IF NOT EXISTS ${schemaConnection(schemaName)}`;
     console.log(`✅ Schema '${schemaName}' ensured to exist`);
-
-    console.log(`🔑 Granting PUBLIC access to schema '${schemaName}'...`);
-    await schemaConnection`GRANT USAGE ON SCHEMA ${schemaConnection(schemaName)} TO PUBLIC`;
-    await schemaConnection`GRANT CREATE ON SCHEMA ${schemaConnection(schemaName)} TO PUBLIC`;
-    await schemaConnection`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ${schemaConnection(schemaName)} TO PUBLIC`;
-    await schemaConnection`ALTER DEFAULT PRIVILEGES IN SCHEMA ${schemaConnection(schemaName)} GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO PUBLIC`;
-    console.log(`✅ Grants applied`);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.warn(`⚠️ Schema creation/grant warning:`, errorMessage);
-    // Continue — schema may already exist and grants may be applied from a prior run
+    console.warn(`⚠️ Schema creation warning:`, errorMessage);
+    // Continue — schema may already exist
   } finally {
     await schemaConnection.end().catch(() => {});
   }
@@ -82,9 +75,8 @@ async function main() {
     console.log('📂 Migrations folder:', migrationsFolder);
     console.log('🔄 Applying pending migrations...');
 
-    // Store migration tracking in the app schema instead of the default `drizzle`
-    // schema — the app SP may not own the `drizzle` schema if it was created by
-    // a different principal (e.g. a local personal account).
+    // Store migration tracking in the app schema so the app SP (which owns
+    // the schema) can always read/write the migrations table.
     await migrate(db, { migrationsFolder, migrationsSchema: schemaName });
 
     console.log('✅ All migrations applied successfully');
@@ -93,17 +85,18 @@ async function main() {
   } catch (error) {
     await migrationConnection.end().catch(() => {});
 
-    // If permission is denied it means the schema was created by a different principal
-    // (e.g. a personal account running migrations locally). The tables already exist
-    // and the grants above will give runtime access. Allow the build to proceed.
+    // If permission is denied, the schema was likely created by a different
+    // principal (e.g. during local development with a personal token).
+    // Surface the error clearly — runtime will also fail until the schema
+    // is recreated by the correct app SP.
     const postgresCode = (error as any)?.cause?.code;
     if (postgresCode === '42501') {
       console.warn('⚠️  Migration skipped: permission denied for schema access.');
       console.warn(
-        '   Schema/tables were created by a different principal and should already exist.',
+        '   This usually means the schema was created by a different service principal.',
       );
       console.warn(
-        '   Continuing build — runtime access is governed by the Lakebase resource binding.',
+        '   To fix: drop the schema in the database and redeploy so the app SP can recreate it.',
       );
       return;
     }
