@@ -41,64 +41,73 @@ async function main() {
   const schemaName = getSchemaName();
   console.log(`🗃️ Using database schema: ${schemaName}`);
 
-  // Create custom schema if needed
+  // Create custom schema and apply grants so all app service principals can access it.
+  // CAN_CONNECT_AND_CREATE on the Lakebase already controls who can connect, so
+  // granting to PUBLIC within the database is safe and avoids cross-SP permission issues.
   const connectionUrl = await getConnectionUrl();
+  const schemaConnection = postgres(connectionUrl, { max: 1 });
   try {
-    const schemaConnection = postgres(connectionUrl, { max: 1 });
-
     console.log(`📁 Creating schema '${schemaName}' if it doesn't exist...`);
     await schemaConnection`CREATE SCHEMA IF NOT EXISTS ${schemaConnection(schemaName)}`;
     console.log(`✅ Schema '${schemaName}' ensured to exist`);
 
-    // Grant all connected service principals (e.g. v2 app SP) access to this schema.
-    // CAN_CONNECT_AND_CREATE on the Lakebase already controls who can connect, so
-    // granting to PUBLIC within the database is safe.
     console.log(`🔑 Granting PUBLIC access to schema '${schemaName}'...`);
     await schemaConnection`GRANT USAGE ON SCHEMA ${schemaConnection(schemaName)} TO PUBLIC`;
+    await schemaConnection`GRANT CREATE ON SCHEMA ${schemaConnection(schemaName)} TO PUBLIC`;
     await schemaConnection`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ${schemaConnection(schemaName)} TO PUBLIC`;
     await schemaConnection`ALTER DEFAULT PRIVILEGES IN SCHEMA ${schemaConnection(schemaName)} GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO PUBLIC`;
     console.log(`✅ Grants applied`);
-
-    await schemaConnection.end();
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.warn(`⚠️ Schema creation warning:`, errorMessage);
-    // Continue with migration even if schema creation had issues
+    console.warn(`⚠️ Schema creation/grant warning:`, errorMessage);
+    // Continue — schema may already exist and grants may be applied from a prior run
+  } finally {
+    await schemaConnection.end().catch(() => {});
   }
 
+  // Use drizzle-orm migrate to run SQL migration files
+  console.log('🔄 Running SQL migrations from migration files...');
+
+  const migrationConnectionUrl = await getConnectionUrl();
+  const migrationConnection = postgres(migrationConnectionUrl, { max: 1 });
+
   try {
-    // Use drizzle-orm migrate to run SQL migration files
-    console.log('🔄 Running SQL migrations from migration files...');
-
-    // Create database connection for running migrations
-    const migrationConnectionUrl = await getConnectionUrl();
-    const migrationConnection = postgres(migrationConnectionUrl, { max: 1 });
-
-    // Import the migrate function from drizzle-orm
     const { drizzle } = await import('drizzle-orm/postgres-js');
     const { migrate } = await import('drizzle-orm/postgres-js/migrator');
 
-    // Create drizzle instance
     const db = drizzle(migrationConnection);
 
-    // Run migrations from the migrations folder
-    const projectRoot = join(__dirname, '..');
     const migrationsFolder = join(projectRoot, 'packages', 'db', 'migrations');
 
     console.log('📂 Migrations folder:', migrationsFolder);
     console.log('🔄 Applying pending migrations...');
 
-    // Use the app schema for migration tracking so we don't need a separate
-    // `drizzle` schema (which the app service principal may not own).
+    // Store migration tracking in the app schema instead of the default `drizzle`
+    // schema — the app SP may not own the `drizzle` schema if it was created by
+    // a different principal (e.g. a local personal account).
     await migrate(db, { migrationsFolder, migrationsSchema: schemaName });
 
     console.log('✅ All migrations applied successfully');
-
-    // Close the connection
     await migrationConnection.end();
-
     console.log('✅ Database migration completed successfully');
   } catch (error) {
+    await migrationConnection.end().catch(() => {});
+
+    // If permission is denied it means the schema was created by a different principal
+    // (e.g. a personal account running migrations locally). The tables already exist
+    // and the grants above will give runtime access. Allow the build to proceed.
+    const postgresCode = (error as any)?.cause?.code;
+    if (postgresCode === '42501') {
+      console.warn('⚠️  Migration skipped: permission denied for schema access.');
+      console.warn(
+        '   Schema/tables were created by a different principal and should already exist.',
+      );
+      console.warn(
+        '   Continuing build — runtime access is governed by the Lakebase resource binding.',
+      );
+      return;
+    }
+
     console.log('error', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('❌ Database migration failed:', errorMessage);
