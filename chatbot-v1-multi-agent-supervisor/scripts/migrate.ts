@@ -50,6 +50,15 @@ async function main() {
     await schemaConnection`CREATE SCHEMA IF NOT EXISTS ${schemaConnection(schemaName)}`;
     console.log(`✅ Schema '${schemaName}' ensured to exist`);
 
+    // Grant all connected service principals (e.g. v2 app SP) access to this schema.
+    // CAN_CONNECT_AND_CREATE on the Lakebase already controls who can connect, so
+    // granting to PUBLIC within the database is safe.
+    console.log(`🔑 Granting PUBLIC access to schema '${schemaName}'...`);
+    await schemaConnection`GRANT USAGE ON SCHEMA ${schemaConnection(schemaName)} TO PUBLIC`;
+    await schemaConnection`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ${schemaConnection(schemaName)} TO PUBLIC`;
+    await schemaConnection`ALTER DEFAULT PRIVILEGES IN SCHEMA ${schemaConnection(schemaName)} GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO PUBLIC`;
+    console.log(`✅ Grants applied`);
+
     await schemaConnection.end();
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -79,7 +88,9 @@ async function main() {
     console.log('📂 Migrations folder:', migrationsFolder);
     console.log('🔄 Applying pending migrations...');
 
-    await migrate(db, { migrationsFolder });
+    // Use the app schema for migration tracking so we don't need a separate
+    // `drizzle` schema (which the app service principal may not own).
+    await migrate(db, { migrationsFolder, migrationsSchema: schemaName });
 
     console.log('✅ All migrations applied successfully');
 
