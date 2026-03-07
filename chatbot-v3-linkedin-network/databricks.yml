@@ -20,7 +20,7 @@ resources:
   apps:
     databricks_chatbot:
       # NOTE: customize the app name here, if desired
-      name: db-chatbot-${var.resource_name_suffix}
+      name: db-chatbot-v3${var.resource_name_suffix}
       description: "LinkedIn Network Intelligence — AI agent for exploring LinkedIn connections"
       source_code_path: .
       resources:
