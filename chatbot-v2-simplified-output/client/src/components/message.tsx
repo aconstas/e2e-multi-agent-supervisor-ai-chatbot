@@ -125,6 +125,22 @@ const PurePreviewMessage = ({
     [message.parts],
   );
 
+  // Indices of the first and last name-part segments.
+  // Used to show only the initial supervisor text (before the first name part)
+  // and the final supervisor response (after the last name part).
+  const firstNamePartIndex = React.useMemo(
+    () => partSegments.findIndex((seg) => isNamePart(seg[0])),
+    [partSegments],
+  );
+  const lastNamePartIndex = React.useMemo(
+    () =>
+      partSegments.reduce(
+        (last, seg, i) => (isNamePart(seg[0]) ? i : last),
+        -1,
+      ),
+    [partSegments],
+  );
+
   // Check if message only contains non-OAuth errors (no other content)
   const hasOnlyErrors = React.useMemo(() => {
     const nonErrorParts = message.parts.filter(
@@ -227,9 +243,13 @@ const PurePreviewMessage = ({
                 return null;
               }
 
-              // Hide sub-agent output text (text segments that follow a name part)
-              const prevSegmentPart = index > 0 ? partSegments[index - 1][0] : null;
-              if (prevSegmentPart && isNamePart(prevSegmentPart)) {
+              // When name parts are present, only show text before the first name part
+              // (initial supervisor text) or after the last name part (supervisor final response).
+              // Everything in between (sub-agent output, intermediate text) is hidden.
+              if (
+                firstNamePartIndex !== -1 &&
+                !(index < firstNamePartIndex || index > lastNamePartIndex)
+              ) {
                 return null;
               }
 
