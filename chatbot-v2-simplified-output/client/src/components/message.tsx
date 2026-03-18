@@ -29,14 +29,12 @@ import type { ChatMessage } from '@chat-template/core';
 import { useDataStream } from './data-stream-provider';
 import {
   createMessagePartSegments,
-  formatNamePart,
   isNamePart,
   joinMessagePartSegments,
 } from './databricks-message-part-transformers';
 import { MessageError } from './message-error';
 import { MessageOAuthError } from './message-oauth-error';
 import { isCredentialErrorMessage } from '@/lib/oauth-error-utils';
-import { Streamdown } from 'streamdown';
 import { useApproval } from '@/hooks/use-approval';
 
 const LoadingText = ({ children }: { children: React.ReactNode }) => {
@@ -226,13 +224,15 @@ const PurePreviewMessage = ({
 
             if (type === 'text') {
               if (isNamePart(part)) {
-                return (
-                  <Streamdown
-                    key={key}
-                    className="-mb-2 mt-0 border-l-4 pl-2 text-muted-foreground"
-                  >{`# ${formatNamePart(part)}`}</Streamdown>
-                );
+                return null;
               }
+
+              // Hide sub-agent output text (text segments that follow a name part)
+              const prevSegmentPart = index > 0 ? partSegments[index - 1][0] : null;
+              if (prevSegmentPart && isNamePart(prevSegmentPart)) {
+                return null;
+              }
+
               if (mode === 'view') {
                 return (
                   <div key={key}>
