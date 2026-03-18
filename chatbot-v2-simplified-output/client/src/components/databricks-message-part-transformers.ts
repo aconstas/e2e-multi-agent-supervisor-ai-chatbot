@@ -30,10 +30,17 @@ export const createMessagePartSegments = (parts: ChatMessage['parts']) => {
       !isNamePart(part) &&
       !isNamePart(lastBlock[0])
     ) {
-      // If the text part, or the previous part contains a <name></name> tag, add it to a new block
-      // Otherwise, append sequential text parts to the same block
-      lastBlock.push(part);
-      //   }
+      // Don't merge into the current block if it was preceded by a name part — this keeps
+      // sub-agent output text separate from the supervisor's subsequent response text so
+      // each can be shown/hidden independently.
+      const prevBlock = out[out.length - 2] || null;
+      const prevBlockPrecededByNamePart =
+        prevBlock?.[0] != null && isNamePart(prevBlock[0]);
+      if (prevBlockPrecededByNamePart) {
+        out.push([part]);
+      } else {
+        lastBlock.push(part);
+      }
     }
     // Otherwise, add the current part to a new block
     else {
