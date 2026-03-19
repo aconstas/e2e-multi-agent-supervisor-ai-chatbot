@@ -239,7 +239,9 @@ const PurePreviewMessage = ({
               if (isNamePart(part)) {
                 // The last name part is the supervisor announcing itself — hide it.
                 // All earlier name parts are sub-agent calls — show them as badges.
-                if (index === lastNamePartIndex) {
+                // During streaming we don't know which is last yet, so show all badges
+                // immediately and only hide the supervisor name once streaming completes.
+                if (!isLoading && index === lastNamePartIndex) {
                   return null;
                 }
                 const agentName = formatNamePart(part);
