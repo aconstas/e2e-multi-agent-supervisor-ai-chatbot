@@ -4,10 +4,6 @@ import { AnimatedAssistantIcon } from './animation-assistant-icon';
 import { Response } from './elements/response';
 import { MessageContent } from './elements/message';
 import {
-  Tool,
-  ToolHeader,
-  ToolContent,
-  ToolInput,
   ToolOutput,
   type ToolState,
 } from './elements/tool';
@@ -29,6 +25,7 @@ import type { ChatMessage } from '@chat-template/core';
 import { useDataStream } from './data-stream-provider';
 import {
   createMessagePartSegments,
+  formatNamePart,
   isNamePart,
   joinMessagePartSegments,
 } from './databricks-message-part-transformers';
@@ -240,7 +237,37 @@ const PurePreviewMessage = ({
 
             if (type === 'text') {
               if (isNamePart(part)) {
-                return null;
+                // The last name part is the supervisor announcing itself — hide it.
+                // All earlier name parts are sub-agent calls — show them as badges.
+                if (index === lastNamePartIndex) {
+                  return null;
+                }
+                const agentName = formatNamePart(part);
+                return (
+                  <div
+                    key={key}
+                    className='flex items-center gap-1.5 py-1 text-muted-foreground text-xs'
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="shrink-0"
+                    >
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" />
+                    </svg>
+                    <span>
+                      Calling <span className="font-mono">{agentName}</span>
+                    </span>
+                  </div>
+                );
               }
 
               // When name parts are present, only show text before the first name part
